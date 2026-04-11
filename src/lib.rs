@@ -1,64 +1,60 @@
-//! cuda-causal-graph — GPU causal reasoning
+//! cuda-causal-graph: Causal inference graph with counterfactual reasoning.
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
-use std::collections::{HashMap, HashSet, VecDeque};
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CausalNode { pub id: String, pub label: String, pub confidence: f64, pub causes: Vec<String> }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CausalPath { pub nodes: Vec<String>, pub total_confidence: f64, pub path_length: usize }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InferenceResult { pub hypothesis: String, pub supporting_evidence: Vec<String>, pub counter_evidence: Vec<String>, pub strength: f64 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum NodeType { Event, Observation, RootCause, Mitigation }
-
-#[derive(Debug)]
-pub struct DiagnosisResult { pub root_causes: Vec<(String, f64)>, pub causal_chain: Vec<String>, pub confidence: f64 }
-
-pub struct CausalGraph {
-    nodes: HashMap<String, NodeType>, edges: Vec<(String, String, f64, f64)>,
-    adj: HashMap<String, Vec<String>>, rev: HashMap<String, Vec<String>>,
-}
-
+pub struct CausalGraph { nodes: HashMap<String, CausalNode> }
 impl CausalGraph {
-    pub fn new() -> Self { CausalGraph { nodes: HashMap::new(), edges: Vec::new(), adj: HashMap::new(), rev: HashMap::new() } }
-    pub fn add_node(&mut self, id: &str, nt: NodeType) { self.nodes.insert(id.to_string(), nt); }
-    pub fn add_edge(&mut self, from: &str, to: &str, w: f64, e: f64) {
-        self.edges.push((from.to_string(), to.to_string(), w, e));
-        self.adj.entry(from.to_string()).or_default().push(to.to_string());
-        self.rev.entry(to.to_string()).or_default().push(from.to_string());
+    pub fn new() -> Self { Self { nodes: HashMap::new() } }
+    pub fn add_node(&mut self, id: &str, label: &str, confidence: f64, causes: Vec<&str>) {
+        self.nodes.insert(id.into(), CausalNode { id: id.into(), label: label.into(), confidence, causes: causes.iter().map(|s| s.to_string()).collect() });
     }
-    pub fn diagnose(&self, obs: &str) -> DiagnosisResult {
-        let mut visited = HashSet::new(); let mut queue = VecDeque::new();
-        let mut chain = Vec::new(); let mut roots = Vec::new();
-        queue.push_back(obs.to_string()); visited.insert(obs.to_string());
-        while let Some(cur) = queue.pop_front() {
-            if let Some(&nt) = self.nodes.get(&cur) {
-                if nt == NodeType::RootCause { roots.push((cur.clone(), self.evidence(&cur))); }
-            }
-            chain.push(cur.clone());
-            if let Some(parents) = self.rev.get(&cur) {
-                for p in parents { if !visited.contains(p) { visited.insert(p.clone()); queue.push_back(p.clone()); } }
-            }
+    pub fn trace(&self, from: &str) -> Vec<CausalPath> {
+        let mut paths = Vec::new(); let mut current = vec![vec![from.to_string()]];
+        while let Some(path) = current.pop() {
+            let last = path.last().unwrap().clone();
+            let effects: Vec<String> = self.nodes.values().filter(|n| n.causes.contains(&last)).map(|n| n.id.clone()).collect();
+            if effects.is_empty() { let conf: f64 = path.iter().map(|n| self.nodes.get(n).map(|nd| nd.confidence).unwrap_or(0.0)).product(); paths.push(CausalPath { nodes: path, total_confidence: conf, path_length: path.len() }); }
+            else { for e in effects { let mut p = path.clone(); p.push(e); current.push(p); } }
         }
-        roots.sort_by(|a,b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        DiagnosisResult { root_causes: roots, causal_chain: chain, confidence: roots.first().map(|(_,c)|*c).unwrap_or(0.0) }
+        paths
     }
-    fn evidence(&self, node: &str) -> f64 { self.edges.iter().filter(|(_,t,_,_)| t == node).map(|(_,_,w,e)| w*e).sum() }
-    pub fn topo_sort(&self) -> Vec<String> {
-        let mut deg: HashMap<&str,usize> = HashMap::new();
-        for n in self.nodes.keys() { deg.entry(n.as_str()).or_insert(0); }
-        for (_,to,_,_) in &self.edges { *deg.entry(to.as_str()).or_insert(0) += 1; }
-        let mut q: VecDeque<&str> = deg.iter().filter(|(_,&d)| d==0).map(|(&k,_)| k).collect();
-        let mut res = Vec::new();
-        while let Some(n) = q.pop_front() { res.push(n.to_string());
-            if let Some(ch) = self.adj.get(n) { for c in ch { if let Some(d) = deg.get_mut(c.as_str()) { *d-=1; if *d==0 { q.push_back(c); } } } }
-        }
-        res
+    pub fn infer(&self, hypothesis: &str) -> InferenceResult {
+        let paths = self.trace(hypothesis);
+        let supporting: Vec<String> = paths.iter().filter(|p| p.total_confidence > 0.5).flat_map(|p| p.nodes.clone()).collect();
+        let counter: Vec<String> = paths.iter().filter(|p| p.total_confidence <= 0.5).flat_map(|p| p.nodes.clone()).collect();
+        let strength = if paths.is_empty() { 0.0 } else { paths.iter().map(|p| p.total_confidence).sum::<f64>() / paths.len() as f64 };
+        InferenceResult { hypothesis: hypothesis.into(), supporting_evidence: supporting, counter_evidence: counter, strength }
     }
+    pub fn counterfactual(&self, node_id: &str, removed_cause: &str) -> f64 {
+        if let Some(node) = self.nodes.get(node_id) {
+            let active_causes: Vec<&String> = node.causes.iter().filter(|c| c.as_str() != removed_cause).collect();
+            if active_causes.is_empty() { return node.confidence * 0.1; }
+            node.confidence * (active_causes.len() as f64 / node.causes.len() as f64)
+        } else { 0.0 }
+    }
+    pub fn node_count(&self) -> usize { self.nodes.len() }
 }
 
 #[cfg(test)]
-mod tests { use super::*;
-    #[test] fn test_diagnosis() {
+mod tests {
+    use super::*;
+    fn make_graph() -> CausalGraph {
         let mut g = CausalGraph::new();
-        g.add_node("temp", NodeType::RootCause); g.add_node("fan", NodeType::RootCause);
-        g.add_node("heat", NodeType::Event); g.add_node("shutdown", NodeType::Observation);
-        g.add_edge("temp", "heat", 0.8, 0.9); g.add_edge("fan", "heat", 0.7, 0.8);
-        g.add_edge("heat", "shutdown", 0.9, 0.95);
-        let d = g.diagnose("shutdown"); assert!(!d.root_causes.is_empty());
+        g.add_node("rain", "Rainfall", 0.9, vec![]);
+        g.add_node("wet", "Wet ground", 0.8, vec!["rain"]);
+        g.add_node("slip", "Slippery", 0.7, vec!["wet"]);
+        g
     }
+    #[test] fn test_trace() { let g = make_graph(); let paths = g.trace("rain"); assert_eq!(paths.len(), 2); assert_eq!(paths[0].path_length, 3); }
+    #[test] fn test_confidence_product() { let g = make_graph(); let paths = g.trace("rain"); assert!((paths[0].total_confidence - (0.9 * 0.8 * 0.7)).abs() < 0.01); }
+    #[test] fn test_counterfactual() { let g = make_graph(); let orig = g.nodes.get("slip").unwrap().confidence; let without = g.counterfactual("slip", "wet"); assert!(without < orig); }
+    #[test] fn test_infer() { let g = make_graph(); let r = g.infer("rain"); assert!(r.strength > 0.5); }
+    #[test] fn test_empty() { let g = CausalGraph::new(); assert_eq!(g.node_count(), 0); }
 }
