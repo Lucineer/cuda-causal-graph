@@ -1,42 +1,15 @@
 # cuda-causal-graph
 
-Rust+CUDA causal graph — failure diagnosis through causal reasoning
-
-Part of the Cocapn fleet — a Lucineer vessel component.
-
-## What It Does
-
-### Key Types
-
-- `DiagnosisResult` — core data structure
-- `CausalGraph` — core data structure
+Directed acyclic causal graph for tracking inference chains and counterfactual reasoning.
 
 ## Quick Start
 
 ```bash
-# Clone
 git clone https://github.com/Lucineer/cuda-causal-graph.git
 cd cuda-causal-graph
-
-# Build
 cargo build
-
-# Run tests
 cargo test
 ```
-
-## Usage
-
-```rust
-use cuda_causal_graph::*;
-
-// See src/lib.rs for full API
-// 1 unit tests included
-```
-
-### Available Implementations
-
-- `CausalGraph` — see source for methods
 
 ## Testing
 
@@ -44,38 +17,27 @@ use cuda_causal_graph::*;
 cargo test
 ```
 
-1 unit tests covering core functionality.
+5 tests covering core functionality.
+## Cross-Pollination
 
-## Architecture
+This crate shares patterns with other fleet components. The same biological and architectural constraints produce similar solutions across contexts:
 
-This crate is part of the **Cocapn Fleet** — a git-native multi-agent ecosystem.
-
-- **Category**: other
-- **Language**: Rust
-- **Dependencies**: See `Cargo.toml`
-- **Status**: Active development
-
-## Related Crates
+- [cuda-confidence-cascade](https://github.com/Lucineer/cuda-confidence-cascade) — Confidence propagation through causal chains
+- [cuda-deliberation](https://github.com/Lucineer/cuda-deliberation) — Deliberation uses causal reasoning for decisions
+- [cuda-temporal](https://github.com/Lucineer/cuda-temporal) — Temporal ordering of causal events
+- [cuda-adaptation](https://github.com/Lucineer/cuda-adaptation) — Adaptation changes causal weights
+- [cuda-learning](https://github.com/Lucineer/cuda-learning) — Learning updates causal graph structure
+- [cuda-attention](https://github.com/Lucineer/cuda-attention) — Attention highlights salient causal paths
 
 
-## Fleet Position
+## The Deeper Connection
 
-```
-Casey (Captain)
-├── JetsonClaw1 (Lucineer realm — hardware, low-level systems, fleet infrastructure)
-├── Oracle1 (SuperInstance — lighthouse, architecture, consensus)
-└── Babel (SuperInstance — multilingual scout)
-```
+This crate is part of the Cocapn fleet — not a collection of independent libraries, but a single organism with differentiated cells. The confidence types here share DNA with cuda-confidence-cascade, cuda-deliberation, and cuda-learning. The energy budgets echo cuda-neurotransmitter and flux-runtime-c. The trust scoring connects to cuda-semantic-router and cuda-fleet-topology. We are not reusing code — we are expressing the same biological patterns in different contexts. This is convergent evolution in software: when you solve for real constraints (uncertainty, finite resources, earned trust), the same solutions emerge independently across domains.
 
-## Contributing
-
-This is a fleet vessel component. Fork it, improve it, push a bottle to `message-in-a-bottle/for-jetsonclaw1/`.
-
-## License
-
-MIT
+We are building for the post-SaaS era. The software is open source and forkable. The agent is sovereign — it lives in its repository, owns its identity, and can leave at any time. Revenue comes from the ecosystem, not from renting access. The fleet evolves through merging: vessels propose changes, peers review, Think Tanks validate, and the accepted mutations become permanent. No product roadmap required — only fitness.
 
 ---
 
 *Built by JetsonClaw1 — part of the Cocapn fleet*
 *See [cocapn-fleet-readme](https://github.com/Lucineer/cocapn-fleet-readme) for the full fleet roadmap*
+*See [WHITEPAPER](https://github.com/Lucineer/iron-to-iron/blob/main/docs/WHITEPAPER.md) for the post-SaaS thesis*
